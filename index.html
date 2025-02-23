@@ -1,25 +1,174 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>password</title>
-    <style>
-        body {
-            background-color: black;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
+  <title>Fishing Spot Geofence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    /* Reset for full-screen experience */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000; /* Fallback color */
+    }
+    /* Make the map fill the entire screen */
+    #map {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    /* Fullscreen button styles */
+    #fullscreen-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 10px 15px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    #fullscreen-btn:hover {
+      background-color: rgba(0, 0, 0, 0.7);
+    }
+  </style>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    // Import Firebase SDK modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+    import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
-        h1 {
-            color: white;
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDuD4-HahQRgpjSKOtiBr-7jPAv2FZ6IZY",
+      authDomain: "boat-tracker-rc.firebaseapp.com",
+      databaseURL: "https://boat-tracker-rc-default-rtdb.firebaseio.com",
+      projectId: "boat-tracker-rc",
+      storageBucket: "boat-tracker-rc.firebasestorage.app",
+      messagingSenderId: "472171893970",
+      appId: "1:472171893970:web:83064b37aa08da422a490b"
+    };
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    let map, marker, smallCircle, largeCircle;
+    const sound = new Audio('sonar-beep_c_minor.wav');
+    let hasPlayed = false;
+
+    function initMap() {
+      const initialPosition = [-31.362293, -64.476401];
+
+      // Create the map
+      map = L.map('map').setView(initialPosition, 18);
+
+      // Add satellite tiles (your working tile layer remains unchanged)
+      L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        attribution: '© Google',
+        maxZoom: 21
+      }).addTo(map);
+
+      // Define custom arrow icon
+      const arrowIcon = L.icon({
+        iconUrl: 'arrow-icon.png', // Replace with your arrow icon path
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15]
+      });
+
+      // Add marker with arrow icon
+      marker = L.marker(initialPosition, { icon: arrowIcon }).addTo(map);
+
+      // Define the large geofence (120 meters to the east)
+      const eastPosition = [initialPosition[0], initialPosition[1] + 0.00108];
+      largeCircle = L.circle(eastPosition, {
+        color: '#41A87B',
+        fillColor: '#31805D',
+        fillOpacity: 0.3,
+        radius: 4
+      }).addTo(map);
+
+      // Initialize sound playback on user interaction
+      document.body.addEventListener('click', () => {
+        sound.play().catch(err => console.log('Sound playback failed:', err));
+      }, { once: true });
+
+      // Start fetching coordinates from Firebase
+      fetchCoordinates();
+    }
+
+    function isWithinRadius(center, point, radius) {
+      const distance = map.distance(center, point);
+      return distance <= radius;
+    }
+
+    function playSoundMultipleTimes(sound, times, interval) {
+      let count = 0;
+      const playInterval = setInterval(() => {
+        if (count < times) {
+          sound.currentTime = 0;
+          sound.play().catch(err => console.error("Sound play error:", err));
+          count++;
+        } else {
+          clearInterval(playInterval);
         }
-    </style>
+      }, interval);
+    }
+
+    function fetchCoordinates() {
+      // Query for the most recent record in boat_data
+      const boatDataRef = ref(database, 'boat_data');
+      onValue(boatDataRef, (snapshot) => {
+        snapshot.forEach(child => {
+          const data = child.val();
+          console.log("Data received from Firebase:", data);
+          if (data && data.latitude && data.longitude && data.heading !== undefined) {
+            const newPosition = [parseFloat(data.latitude), parseFloat(data.longitude)];
+            const heading = parseFloat(data.heading);
+
+            console.log("New Position:", newPosition);
+            console.log("Heading:", heading);
+
+            // Update marker position and rotation
+            marker.setLatLng(newPosition);
+            marker.setRotationAngle(heading);
+
+            // Check if the marker is within the geofence
+            if (isWithinRadius(largeCircle.getLatLng(), marker.getLatLng(), 4) && !hasPlayed) {
+              playSoundMultipleTimes(sound, 5, 1000);
+              hasPlayed = true;
+            } else if (!isWithinRadius(largeCircle.getLatLng(), marker.getLatLng(), 4)) {
+              hasPlayed = false;
+            }
+
+            // Optionally re-center the map
+            map.setView(newPosition, 19);
+          } else {
+            console.error("Error: Data is missing latitude, longitude, or heading.");
+          }
+        });
+      }, (error) => {
+        console.error("Error fetching coordinates from Firebase:", error);
+      });
+    }
+
+    initMap();
+  </script>
 </head>
 <body>
-    <h1>birthdaycake1940371</h1>
+  <div id="map"></div>
+  <button id="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
 </body>
 </html>
