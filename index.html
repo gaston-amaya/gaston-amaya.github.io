@@ -43,12 +43,17 @@
       background-color: rgba(0, 0, 0, 0.7);
     }
   </style>
+  
+  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Firebase SDKs -->
+  <!-- Leaflet RotatedMarker plugin -->
+  <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
+  
+  <!-- Firebase SDKs using ES6 modules -->
   <script type="module">
     // Import Firebase SDK modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
-    import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
+    import { getDatabase, ref, query, orderByChild, limitToLast, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
     // Firebase configuration
     const firebaseConfig = {
@@ -60,13 +65,23 @@
       messagingSenderId: "472171893970",
       appId: "1:472171893970:web:83064b37aa08da422a490b"
     };
+
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
 
-    let map, marker, smallCircle, largeCircle;
+    // Global variables
+    let map, marker, largeCircle;
     const sound = new Audio('sonar-beep_c_minor.wav');
     let hasPlayed = false;
+
+    // Rotate the marker using the RotatedMarker plugin
+    // We add a 180° offset so the arrow points the right way.
+    function rotateMarker(heading) {
+      // Adjust the heading by adding 180 degrees.
+      const correctedHeading = (heading + 180) % 360;
+      marker.setRotationAngle(correctedHeading);
+    }
 
     function initMap() {
       const initialPosition = [-31.362293, -64.476401];
@@ -74,24 +89,24 @@
       // Create the map
       map = L.map('map').setView(initialPosition, 18);
 
-      // Add satellite tiles (your working tile layer remains unchanged)
+      // Add satellite tiles
       L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
         attribution: '© Google',
         maxZoom: 21
       }).addTo(map);
 
-      // Define custom arrow icon
+      // Use a Google arrow icon
       const arrowIcon = L.icon({
-        iconUrl: 'arrow-icon.png', // Replace with your arrow icon path
+        iconUrl: 'arrow-icon.png',  // Google's arrow icon
         iconSize: [30, 30],
         iconAnchor: [15, 15],
         popupAnchor: [0, -15]
       });
 
-      // Add marker with arrow icon
-      marker = L.marker(initialPosition, { icon: arrowIcon }).addTo(map);
+      // Add marker with the arrow icon and initialize rotationAngle to 0
+      marker = L.marker(initialPosition, { icon: arrowIcon, rotationAngle: 0 }).addTo(map);
 
-      // Define the large geofence (120 meters to the east)
+      // Define a large geofence (4 meters radius at a point to the east)
       const eastPosition = [initialPosition[0], initialPosition[1] + 0.00108];
       largeCircle = L.circle(eastPosition, {
         color: '#41A87B',
@@ -100,7 +115,7 @@
         radius: 4
       }).addTo(map);
 
-      // Initialize sound playback on user interaction
+      // Enable sound playback on first user interaction
       document.body.addEventListener('click', () => {
         sound.play().catch(err => console.log('Sound playback failed:', err));
       }, { once: true });
@@ -109,11 +124,13 @@
       fetchCoordinates();
     }
 
+    // Utility: Check if a point is within a given radius of a center point
     function isWithinRadius(center, point, radius) {
       const distance = map.distance(center, point);
       return distance <= radius;
     }
 
+    // Utility: Play sound multiple times with a given interval
     function playSoundMultipleTimes(sound, times, interval) {
       let count = 0;
       const playInterval = setInterval(() => {
@@ -127,10 +144,12 @@
       }, interval);
     }
 
+    // Fetch the latest coordinates from Firebase and update the marker
     function fetchCoordinates() {
-      // Query for the most recent record in boat_data
+      // Query for the most recent record in "boat_data"
       const boatDataRef = ref(database, 'boat_data');
-      onValue(boatDataRef, (snapshot) => {
+      const recentDataQuery = query(boatDataRef, orderByChild('timestamp'), limitToLast(1));
+      onValue(recentDataQuery, (snapshot) => {
         snapshot.forEach(child => {
           const data = child.val();
           console.log("Data received from Firebase:", data);
@@ -141,11 +160,12 @@
             console.log("New Position:", newPosition);
             console.log("Heading:", heading);
 
-            // Update marker position and rotation
+            // Update marker position
             marker.setLatLng(newPosition);
-            marker.setRotationAngle(heading);
+            // Rotate marker based on heading (with 180° correction)
+            rotateMarker(heading);
 
-            // Check if the marker is within the geofence
+            // Optionally play sound if within geofence
             if (isWithinRadius(largeCircle.getLatLng(), marker.getLatLng(), 4) && !hasPlayed) {
               playSoundMultipleTimes(sound, 5, 1000);
               hasPlayed = true;
@@ -164,6 +184,7 @@
       });
     }
 
+    // Initialize the map
     initMap();
   </script>
 </head>
