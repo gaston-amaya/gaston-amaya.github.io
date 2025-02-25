@@ -41,6 +41,7 @@
       font-size: 14px;
       cursor: pointer;
       z-index: 1000;
+      transition: all 0.3s ease;
     }
     #fullscreen-btn:hover {
       background-color: rgba(0, 0, 0, 0.7);
@@ -82,6 +83,7 @@
       border-radius: 10px;
       font-size: 16px;
       z-index: 1000;
+      transition: all 0.3s ease;
     }
     #flash-messages {
       position: fixed;
@@ -90,24 +92,41 @@
       z-index: 1100;
       width: 300px;
     }
+    /* New CSS for toggled layout (when in "fullscreen-mode") */
+    .fullscreen-mode #speed-card {
+      top: 20px;
+      right: 20px;
+      top: auto;
+      right: auto;
+    }
+    .fullscreen-mode #add-circle-btn {
+      top: 70px;
+      right: 20px;
+      bottom: auto;
+      left: auto;
+    }
+    .fullscreen-mode #lock-btn {
+      top: 130px;
+      right: 20px;
+      bottom: auto;
+      left: auto;
+    }
   </style>
   
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Leaflet RotatedMarker plugin -->
   <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
-  <!-- Hammer.js for touch gestures -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
   
   <!-- Firebase SDKs using ES6 modules -->
   <script type="module">
-    // Previous imports remain the same
+    // Import Firebase modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { 
       getDatabase, ref, query, orderByChild, limitToLast, onValue, onChildAdded, onChildRemoved, push, remove 
     } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
-    // Firebase configuration remains the same
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyDuD4-HahQRgpjSKOtiBr-7jPAv2FZ6IZY",
       authDomain: "boat-tracker-rc.firebaseapp.com",
@@ -131,7 +150,7 @@
     let addingGeofence = false;
     let isLocked = true; // New variable for tracking lock state
 
-    // Added: starting point constant (in Leaflet LatLng format)
+    // Starting point constant (in Leaflet LatLng format)
     const startingPoint = L.latLng(-31.362276, -64.476491);
 
     // Utility function for showing flash messages
@@ -171,11 +190,24 @@
       }
     }
 
-    // Previous utility functions remain the same
+    // Rotate the marker based on heading
     function rotateMarker(heading) {
       const correctedHeading = (heading + 180) % 360;
       marker.setRotationAngle(correctedHeading);
     }
+
+    // Toggle the layout when the fullscreen button is tapped.
+    function toggleFullscreen() {
+      document.body.classList.toggle("fullscreen-mode");
+      const btn = document.getElementById("fullscreen-btn");
+      if (document.body.classList.contains("fullscreen-mode")) {
+        btn.innerText = "Exit Fullscreen";
+      } else {
+        btn.innerText = "Fullscreen";
+      }
+    }
+    // Expose toggleFullscreen to the global scope.
+    window.toggleFullscreen = toggleFullscreen;
 
     // Initialize the map and UI
     function initMap() {
@@ -228,8 +260,8 @@
       // Add the lock button
       const lockBtn = document.createElement('button');
       lockBtn.id = 'lock-btn';
-      lockBtn.className = 'locked'; // Add locked class initially
-      lockBtn.innerHTML = '<i class="fas fa-lock"></i>'; // Start with locked icon
+      lockBtn.className = 'locked';
+      lockBtn.innerHTML = '<i class="fas fa-lock"></i>';
       lockBtn.onclick = toggleLock;
       document.body.appendChild(lockBtn);
 
@@ -267,25 +299,6 @@
 
       initGeofences();
       fetchCoordinates();
-
-      // Set up Hammer.js to allow map rotation with fingers.
-      // Only the tile pane rotates while markers remain unrotated.
-      map.whenReady(() => {
-        const mapContainer = map.getContainer();
-        const hammer = new Hammer(mapContainer);
-        hammer.get('rotate').set({ enable: true });
-        let currentRotation = 0;
-        hammer.on('rotatestart', () => {
-          // You can store the initial rotation if needed.
-        });
-        hammer.on('rotatemove', (e) => {
-          // Rotate only the tile pane.
-          map._panes.tilePane.style.transform = `rotate(${currentRotation + e.rotation}deg)`;
-        });
-        hammer.on('rotateend', (e) => {
-          currentRotation += e.rotation;
-        });
-      });
     }
 
     function initGeofences() {
@@ -362,7 +375,6 @@
       setTimeout(() => confirmDiv.classList.add('show'), 10);
     }
 
-    // Previous utility functions remain the same
     function isWithinRadius(center, point, radius) {
       const distance = map.distance(center, point);
       return distance <= radius;
@@ -413,7 +425,7 @@
             const internetStatus = data.internet_status;
             const batteryPercentage = data.battery_percentage;
 
-            // Added: calculate distance from the starting point in km
+            // Calculate distance from the starting point in km
             const currentLatLng = L.latLng(newPosition);
             const distanceFromStart = currentLatLng.distanceTo(startingPoint);
             const distanceKm = (distanceFromStart / 1000).toFixed(2);
@@ -463,6 +475,7 @@
 <body>
   <div id="map"></div>
   <div id="flash-messages"></div>
+  <!-- When tapped, the fullscreen button toggles the UI positions -->
   <button id="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
