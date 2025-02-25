@@ -12,7 +12,7 @@
   <!-- Font Awesome for lock icon -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
-    /* Previous styles remain the same */
+    /* Base styles */
     html, body {
       margin: 0;
       padding: 0;
@@ -51,6 +51,7 @@
       bottom: 20px;
       right: 20px;
       z-index: 1000;
+      transition: all 0.3s ease;
     }
     #lock-btn {
       position: absolute;
@@ -92,24 +93,20 @@
       z-index: 1100;
       width: 300px;
     }
-    /* New CSS for toggled layout (when in "fullscreen-mode") */
+    /* Fullscreen-mode: reposition & rotate elements so they read correctly when your phone is sideways */
     .fullscreen-mode #speed-card {
-      top: 20px;
-      right: 20px;
       top: auto;
       right: auto;
+      transform: rotate(90deg);
+      transform-origin: top initial;
     }
-    .fullscreen-mode #add-circle-btn {
-      top: 70px;
-      right: 20px;
-      bottom: auto;
-      left: auto;
+    .fullscreen-mode #flash-messages {
+      transform: rotate(90deg);
+      transform-origin: left top;
     }
     .fullscreen-mode #lock-btn {
-      top: 130px;
-      right: 20px;
-      bottom: auto;
-      left: auto;
+      transform: rotate(90deg);
+      transform-origin: top initial;
     }
   </style>
   
@@ -147,6 +144,7 @@
     const sound = new Audio('sonar-beep_c_minor.wav');
     let hasPlayed = false;
     let geofenceCircles = {};
+    let geofenceLabels = {};  // NEW: to hold label markers for each geofence
     let addingGeofence = false;
     let isLocked = true; // New variable for tracking lock state
 
@@ -181,12 +179,12 @@
         lockBtn.classList.add('locked');
         lockIcon.classList.remove('fa-unlock');
         lockIcon.classList.add('fa-lock');
-        showFlashMessage('Mapa Bloqueado', 'success');
+        showFlashMessage('Mapa locked', 'success');
       } else {
         lockBtn.classList.remove('locked');
         lockIcon.classList.remove('fa-lock');
         lockIcon.classList.add('fa-unlock');
-        showFlashMessage('Map Desbloqueado', 'info');
+        showFlashMessage('Map unlocked ', 'info');
       }
     }
 
@@ -196,7 +194,7 @@
       marker.setRotationAngle(correctedHeading);
     }
 
-    // Toggle the layout when the fullscreen button is tapped.
+    // Toggle the layout (reposition & rotate UI elements)
     function toggleFullscreen() {
       document.body.classList.toggle("fullscreen-mode");
       const btn = document.getElementById("fullscreen-btn");
@@ -206,13 +204,14 @@
         btn.innerText = "Fullscreen";
       }
     }
-    // Expose toggleFullscreen to the global scope.
+    // Expose toggleFullscreen globally.
     window.toggleFullscreen = toggleFullscreen;
 
     // Initialize the map and UI
     function initMap() {
       const initialPosition = [-31.362293, -64.476401];
-      map = L.map('map').setView(initialPosition, 18);
+      // Remove the default zoom control by setting zoomControl to false
+      map = L.map('map', { zoomControl: false }).setView(initialPosition, 18);
 
       // Add satellite tiles
       L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
@@ -276,7 +275,7 @@
         }
       });
 
-      // Map click handler
+      // Map click handler for adding a geofence
       map.on('click', (e) => {
         if (addingGeofence) {
           const lat = e.latlng.lat;
@@ -307,14 +306,16 @@
       onChildAdded(geofenceRef, (snapshot) => {
         const key = snapshot.key;
         const data = snapshot.val();
-        const circle = L.circle([parseFloat(data.latitude), parseFloat(data.longitude)], {
+        const lat = parseFloat(data.latitude);
+        const lng = parseFloat(data.longitude);
+        const circle = L.circle([lat, lng], {
           color: '#FF0000',
           fillColor: '#FF6666',
           fillOpacity: 0.3,
           radius: data.radius
         }).addTo(map);
         
-        // Simplified click handler
+        // Simplified click handler for deletion
         circle.on('click', function(e) {
           L.DomEvent.stopPropagation(e);
           L.DomEvent.preventDefault(e);
@@ -322,6 +323,20 @@
         });
         
         geofenceCircles[key] = circle;
+        
+        // Create a label marker showing the distance from the starting point
+        const distance = L.latLng(lat, lng).distanceTo(startingPoint);
+        const distanceKm = (distance / 1000).toFixed(2);
+        const labelIcon = L.divIcon({
+          html: `<div style="color: white; font-size: 14px; text-shadow: 0 0 3px black; transform: translateY(-20px);">
+                   ${distanceKm} km
+                 </div>`,
+          className: '',  // No default class styling
+          iconSize: [50, 20],
+          iconAnchor: [25, 10]
+        });
+        const labelMarker = L.marker([lat, lng], { icon: labelIcon, interactive: false }).addTo(map);
+        geofenceLabels[key] = labelMarker;
       });
 
       onChildRemoved(geofenceRef, (snapshot) => {
@@ -330,12 +345,15 @@
           map.removeLayer(geofenceCircles[key]);
           delete geofenceCircles[key];
         }
+        if (geofenceLabels[key]) {
+          map.removeLayer(geofenceLabels[key]);
+          delete geofenceLabels[key];
+        }
       });
     }
 
     // Modified deleteGeofence function
     window.deleteGeofence = function(key) {
-      // Remove the confirmation message first
       const confirmations = document.querySelectorAll('.delete-confirmation');
       confirmations.forEach(conf => conf.remove());
 
@@ -351,8 +369,6 @@
 
     function showDeleteConfirmation(key) {
       const flashContainer = document.getElementById('flash-messages');
-      
-      // Remove any existing delete confirmations
       const existingConfirmations = document.querySelectorAll('.delete-confirmation');
       existingConfirmations.forEach(confirmation => confirmation.remove());
       
@@ -366,12 +382,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       `;
       
-      // Prevent auto-dismissal of this specific alert
       confirmDiv.addEventListener('click', (e) => e.stopPropagation());
       
       flashContainer.appendChild(confirmDiv);
-      
-      // Manually trigger the fade in
       setTimeout(() => confirmDiv.classList.add('show'), 10);
     }
 
@@ -421,7 +434,6 @@
             lastTimestamp = currentTime;
 
             const speedReal = parseFloat(data.speedKmh);
-
             const internetStatus = data.internet_status;
             const batteryPercentage = data.battery_percentage;
 
@@ -440,7 +452,6 @@
             marker.setLatLng(newPosition);
             rotateMarker(heading);
 
-            // If locked, center the map on the marker
             if (isLocked) {
               map.setView(newPosition, map.getZoom(21));
             }
@@ -475,7 +486,7 @@
 <body>
   <div id="map"></div>
   <div id="flash-messages"></div>
-  <!-- When tapped, the fullscreen button toggles the UI positions -->
+  <!-- Tapping this button toggles the UI layout and rotates the card/buttons -->
   <button id="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
