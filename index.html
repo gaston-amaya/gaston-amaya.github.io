@@ -280,7 +280,7 @@
         if (addingGeofence) {
           const lat = e.latlng.lat;
           const lng = e.latlng.lng;
-          const radius = 4;
+          const radius = 1;
           push(ref(database, 'geofences'), {
             latitude: lat,
             longitude: lng,
