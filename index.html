@@ -93,6 +93,7 @@
       z-index: 1100;
       width: 300px;
     }
+    
     /* Fullscreen-mode: reposition & rotate elements so they read correctly when your phone is sideways */
     .fullscreen-mode #speed-card {
       top: auto;
@@ -230,12 +231,6 @@
       marker = L.marker(initialPosition, { icon: arrowIcon, rotationAngle: 0 }).addTo(map);
 
       const eastPosition = [initialPosition[0], initialPosition[1] + 0.00108];
-      largeCircle = L.circle(eastPosition, {
-        color: '#41A87B',
-        fillColor: '#31805D',
-        fillOpacity: 0.3,
-        radius: 4
-      }).addTo(map);
 
       // Add the speed display card
       const speedCard = document.createElement('div');
@@ -280,7 +275,7 @@
         if (addingGeofence) {
           const lat = e.latlng.lat;
           const lng = e.latlng.lng;
-          const radius = 1;
+          const radius = 4;
           push(ref(database, 'geofences'), {
             latitude: lat,
             longitude: lng,
@@ -309,8 +304,8 @@
         const lat = parseFloat(data.latitude);
         const lng = parseFloat(data.longitude);
         const circle = L.circle([lat, lng], {
-          color: '#FF0000',
-          fillColor: '#FF6666',
+          color: '#41A87B',
+          fillColor: '#31805D',
           fillOpacity: 0.3,
           radius: data.radius
         }).addTo(map);
@@ -326,10 +321,10 @@
         
         // Create a label marker showing the distance from the starting point
         const distance = L.latLng(lat, lng).distanceTo(startingPoint);
-        const distanceKm = (distance / 1000).toFixed(2);
+        const distanceKm = distance.toFixed(2);
         const labelIcon = L.divIcon({
           html: `<div style="color: white; font-size: 14px; text-shadow: 0 0 3px black; transform: translateY(-20px);">
-                   ${distanceKm} km
+                   ${distanceKm} m
                  </div>`,
           className: '',  // No default class styling
           iconSize: [50, 20],
@@ -440,13 +435,13 @@
             // Calculate distance from the starting point in km
             const currentLatLng = L.latLng(newPosition);
             const distanceFromStart = currentLatLng.distanceTo(startingPoint);
-            const distanceKm = (distanceFromStart / 1000).toFixed(2);
+            const distanceKm = distanceFromStart.toFixed(2);
 
             document.getElementById('speed-card').innerHTML = `
               Status: ${internetStatus ? 'Online 🟢' : 'Offline 🔴'}<br>
               Speed: ${speedReal} km/h<br>
               Battery: ${batteryPercentage}%<br>
-              Distance: ${distanceKm} km
+              Distance: ${distanceKm} m
             `;
 
             marker.setLatLng(newPosition);
