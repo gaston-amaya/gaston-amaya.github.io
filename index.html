@@ -96,6 +96,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Leaflet RotatedMarker plugin -->
   <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
+  <!-- Hammer.js for touch gestures -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
   
   <!-- Firebase SDKs using ES6 modules -->
   <script type="module">
@@ -128,6 +130,9 @@
     let geofenceCircles = {};
     let addingGeofence = false;
     let isLocked = true; // New variable for tracking lock state
+
+    // Added: starting point constant (in Leaflet LatLng format)
+    const startingPoint = L.latLng(-31.362276, -64.476491);
 
     // Utility function for showing flash messages
     function showFlashMessage(message, type = 'info', duration = 10000) {
@@ -209,16 +214,16 @@
 
       // Add the floating add geofence button
       const addBtn = document.createElement('button');
-addBtn.id = 'add-circle-btn';
-addBtn.className = 'btn btn-success rounded-circle';
-addBtn.style.width = '60px';
-addBtn.style.height = '60px';
-addBtn.style.fontSize = '20px';
-addBtn.style.display = 'flex';
-addBtn.style.alignItems = 'center';
-addBtn.style.justifyContent = 'center';
-addBtn.innerHTML = '+';
-document.body.appendChild(addBtn);
+      addBtn.id = 'add-circle-btn';
+      addBtn.className = 'btn btn-success rounded-circle';
+      addBtn.style.width = '60px';
+      addBtn.style.height = '60px';
+      addBtn.style.fontSize = '20px';
+      addBtn.style.display = 'flex';
+      addBtn.style.alignItems = 'center';
+      addBtn.style.justifyContent = 'center';
+      addBtn.innerHTML = '+';
+      document.body.appendChild(addBtn);
 
       // Add the lock button
       const lockBtn = document.createElement('button');
@@ -262,6 +267,25 @@ document.body.appendChild(addBtn);
 
       initGeofences();
       fetchCoordinates();
+
+      // Set up Hammer.js to allow map rotation with fingers.
+      // Only the tile pane rotates while markers remain unrotated.
+      map.whenReady(() => {
+        const mapContainer = map.getContainer();
+        const hammer = new Hammer(mapContainer);
+        hammer.get('rotate').set({ enable: true });
+        let currentRotation = 0;
+        hammer.on('rotatestart', () => {
+          // You can store the initial rotation if needed.
+        });
+        hammer.on('rotatemove', (e) => {
+          // Rotate only the tile pane.
+          map._panes.tilePane.style.transform = `rotate(${currentRotation + e.rotation}deg)`;
+        });
+        hammer.on('rotateend', (e) => {
+          currentRotation += e.rotation;
+        });
+      });
     }
 
     function initGeofences() {
@@ -363,7 +387,7 @@ document.body.appendChild(addBtn);
       return speed * 3.6;
     }
 
-    // Modified fetchCoordinates to include lock functionality
+    // Modified fetchCoordinates to include lock functionality and distance from starting point
     function fetchCoordinates() {
       let lastTimestamp = Date.now();
       const boatDataRef = ref(database, 'boat_data');
@@ -389,10 +413,16 @@ document.body.appendChild(addBtn);
             const internetStatus = data.internet_status;
             const batteryPercentage = data.battery_percentage;
 
+            // Added: calculate distance from the starting point in km
+            const currentLatLng = L.latLng(newPosition);
+            const distanceFromStart = currentLatLng.distanceTo(startingPoint);
+            const distanceKm = (distanceFromStart / 1000).toFixed(2);
+
             document.getElementById('speed-card').innerHTML = `
               Status: ${internetStatus ? 'Online 🟢' : 'Offline 🔴'}<br>
               Speed: ${speedReal} km/h<br>
-              Battery: ${batteryPercentage}%
+              Battery: ${batteryPercentage}%<br>
+              Distance: ${distanceKm} km
             `;
 
             marker.setLatLng(newPosition);
