@@ -429,6 +429,7 @@
             lastTimestamp = currentTime;
 
             const speedReal = parseFloat(data.speedKmh);
+            const speedRealFormatted = speedReal.toFixed(2);
             const internetStatus = data.internet_status;
             const batteryPercentage = data.battery_percentage;
 
@@ -439,7 +440,7 @@
 
             document.getElementById('speed-card').innerHTML = `
               Status: ${internetStatus ? 'Online 🟢' : 'Offline 🔴'}<br>
-              Speed: ${speedReal} km/h<br>
+              Speed: ${speedRealFormatted} km/h<br>
               Battery: ${batteryPercentage}%<br>
               Distance: ${distanceKm} m
             `;
