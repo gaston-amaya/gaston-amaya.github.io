@@ -297,71 +297,72 @@
     }
 
     function initGeofences() {
-      const geofenceRef = ref(database, 'geofences');
-      
-      onChildAdded(geofenceRef, (snapshot) => {
-        const key = snapshot.key;
-        const data = snapshot.val();
-        const lat = parseFloat(data.latitude);
-        const lng = parseFloat(data.longitude);
-        const circle = L.circle([lat, lng], {
-          color: '#41A87B',
-          fillColor: '#31805D',
-          fillOpacity: 0.3,
-          radius: data.radius
-        }).addTo(map);
-        
-        // Simplified click handler for deletion
-        circle.on('click', function(e) {
-          L.DomEvent.stopPropagation(e);
-          L.DomEvent.preventDefault(e);
-          showDeleteConfirmation(key);
-        });
-        
-        geofenceCircles[key] = circle;
-        
-        // Create a label marker showing the distance from the starting point
-        const distance = L.latLng(lat, lng).distanceTo(startingPoint);
-        const distanceKm = distance.toFixed(2);
-        const labelIcon = L.divIcon({
-          html: `<div style="color: white; font-size: 14px; text-shadow: 0 0 3px black; transform: translateY(-20px);">
-                   ${distanceKm} m
-                 </div>`,
-          className: '',  // No default class styling
-          iconSize: [50, 20],
-          iconAnchor: [25, 10]
-        });
-        const labelMarker = L.marker([lat, lng], { icon: labelIcon, interactive: false }).addTo(map);
-        geofenceLabels[key] = labelMarker;
-      });
+  const geofenceRef = ref(database, 'geofences');
+  
+  onChildAdded(geofenceRef, (snapshot) => {
+    const key = snapshot.key;
+    const data = snapshot.val();
+    const lat = parseFloat(data.latitude);
+    const lng = parseFloat(data.longitude);
+    const circle = L.circle([lat, lng], {
+      color: '#41A87B',
+      fillColor: '#31805D',
+      fillOpacity: 0.3,
+      radius: data.radius
+    }).addTo(map);
+    
+    // Simplified click handler for deletion
+    circle.on('click', function(e) {
+      L.DomEvent.stopPropagation(e);
+      L.DomEvent.preventDefault(e);
+      showDeleteConfirmation(key);
+    });
+    
+    geofenceCircles[key] = circle;
+    
+    // Create a label marker showing the distance from the starting point
+    const distance = L.latLng(lat, lng).distanceTo(startingPoint);
+    const distanceKm = distance.toFixed(2);
+    const labelIcon = L.divIcon({
+      html: `<div style="color: white; font-size: 14px; text-shadow: 0 0 3px black; transform: translateY(-20px);">
+               ${distanceKm} m
+             </div>`,
+      className: '',  // No default class styling
+      iconSize: [50, 20],
+      iconAnchor: [25, 10]
+    });
+    const labelMarker = L.marker([lat, lng], { icon: labelIcon, interactive: false }).addTo(map);
+    geofenceLabels[key] = labelMarker;
+    playSoundMultipleTimes(sound, 3, 1000); // Play the sound 3 times with 1-second interval
+  });
 
-      onChildRemoved(geofenceRef, (snapshot) => {
-        const key = snapshot.key;
-        if (geofenceCircles[key]) {
-          map.removeLayer(geofenceCircles[key]);
-          delete geofenceCircles[key];
-        }
-        if (geofenceLabels[key]) {
-          map.removeLayer(geofenceLabels[key]);
-          delete geofenceLabels[key];
-        }
-      });
+  onChildRemoved(geofenceRef, (snapshot) => {
+    const key = snapshot.key;
+    if (geofenceCircles[key]) {
+      map.removeLayer(geofenceCircles[key]);
+      delete geofenceCircles[key];
     }
+    if (geofenceLabels[key]) {
+      map.removeLayer(geofenceLabels[key]);
+      delete geofenceLabels[key];
+    }
+  });
+}
 
-    // Modified deleteGeofence function
-    window.deleteGeofence = function(key) {
-      const confirmations = document.querySelectorAll('.delete-confirmation');
-      confirmations.forEach(conf => conf.remove());
+// Modified deleteGeofence function
+window.deleteGeofence = function(key) {
+  const confirmations = document.querySelectorAll('.delete-confirmation');
+  confirmations.forEach(conf => conf.remove());
 
-      remove(ref(database, 'geofences/' + key))
-        .then(() => {
-          showFlashMessage("Marker deleted successfully!", "success", 3000);
-        })
-        .catch(err => {
-          console.error("Error deleting geofence:", err);
-          showFlashMessage("Error deleting marker", "danger", 5000);
-        });
-    };
+  remove(ref(database, 'geofences/' + key))
+    .then(() => {
+      showFlashMessage("Marker deleted successfully!", "success", 3000);
+    })
+    .catch(err => {
+      console.error("Error deleting geofence:", err);
+      showFlashMessage("Error deleting marker", "danger", 5000);
+    });
+};
 
     function showDeleteConfirmation(key) {
       const flashContainer = document.getElementById('flash-messages');
