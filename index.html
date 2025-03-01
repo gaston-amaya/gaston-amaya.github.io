@@ -121,7 +121,7 @@
     // Import Firebase modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { 
-      getDatabase, ref, query, orderByChild, limitToLast, onValue, onChildAdded, onChildRemoved, push, remove 
+      getDatabase, ref, query, orderByChild, limitToLast, onValue, onChildAdded, onChildRemoved, push, remove, get
     } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
     // Firebase configuration
@@ -293,6 +293,7 @@
 
       initGeofences();
       fetchCoordinates();
+      fetchHeading()
     }
 
     function initGeofences() {
@@ -418,7 +419,6 @@
           console.log("Data received from Firebase:", data);
           if (data && data.latitude && data.longitude && data.heading !== undefined) {
             const newPosition = [parseFloat(data.latitude), parseFloat(data.longitude)];
-            const heading = parseFloat(data.heading);
 
             const accelX = parseFloat(data.acceleration_x);
             const accelY = parseFloat(data.acceleration_y);
@@ -446,7 +446,7 @@
             `;
 
             marker.setLatLng(newPosition);
-            rotateMarker(heading);
+            //rotateMarker(heading);
 
             if (isLocked) {
               map.setView(newPosition, map.getZoom(21));
@@ -474,6 +474,37 @@
         console.error("Error fetching coordinates from Firebase:", error);
       });
     }
+
+    function fetchHeading() {
+    let lastTimestamp = Date.now();
+    const headingRef = ref(database, 'heading');  // Reference to heading data
+
+    const recentHeadingQuery = query(headingRef, orderByChild('timestamp'), limitToLast(1));
+
+    onValue(recentHeadingQuery, (snapshot) => {
+        snapshot.forEach(child => {
+            const data = child.val();
+            console.log("Heading data received from Firebase:", data);
+
+            if (data && data.heading !== undefined) {
+                const latestHeading = parseFloat(data.heading);  // Extract heading value
+
+                // If you need to calculate something similar to fetchCoordinates, you can add logic here
+                const currentTime = Date.now();
+                const deltaTime = (currentTime - lastTimestamp) / 1000;
+                lastTimestamp = currentTime;
+
+                console.log("Latest Heading received:", latestHeading);
+                rotateMarker(latestHeading);  // Call to update the map marker with the heading
+            } else {
+                console.error("⚠️ Error: Heading data is missing.");
+            }
+        });
+    }, (error) => {
+        console.error("❌ Error fetching heading from Firebase:", error);
+    });
+}
+
 
     // Initialize the map on page load
     initMap();
