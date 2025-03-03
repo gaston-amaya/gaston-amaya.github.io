@@ -191,7 +191,7 @@
 
     // Rotate the marker based on heading
     function rotateMarker(heading) {
-      const correctedHeading = (heading + 90) % 360;
+      const correctedHeading = (heading + 180) % 360;
       marker.setRotationAngle(correctedHeading);
     }
 
